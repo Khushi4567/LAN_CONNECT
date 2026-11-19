@@ -409,7 +409,7 @@ class LANConnectClient:
 
         tk.Label(
             flow_title,
-            text="Live TCP/IP Flow",
+            text="Live OSI Flow",
             font=("Arial", 12, "bold")
         ).pack(side=tk.LEFT)
 
@@ -788,8 +788,8 @@ class LANConnectClient:
             )
         )
 
-    # INTERACTIVE TCP/IP PACKET JOURNEY
-    # The chat screen and its existing controls are intentionally unchanged.
+    # INTERACTIVE OSI 7-LAYER PACKET JOURNEY
+    # Only the demonstration popup is changed; the original LANConnect chat UI remains intact.
     def show_tcp_ip_demo(self):
 
         if self.demo_window and self.demo_window.winfo_exists():
@@ -797,52 +797,45 @@ class LANConnectClient:
             return
 
         self.demo_window = tk.Toplevel(self.window)
-        self.demo_window.title("LANConnect - How a Message Travels")
-        self.demo_window.geometry("1060x790")
-        self.demo_window.minsize(900, 700)
+        self.demo_window.title("LANConnect - OSI 7-Layer Demonstration")
+        self.demo_window.geometry("1120x850")
+        self.demo_window.minsize(980, 760)
         self.demo_window.configure(bg="white")
         self.demo_window.protocol("WM_DELETE_WINDOW", self.close_tcp_ip_demo)
 
         tk.Label(
             self.demo_window,
-            text="How a message travels across the network",
-            font=("Arial", 16, "bold"), bg="white"
+            text="How a message travels through the OSI Model",
+            font=("Arial", 17, "bold"), bg="white"
         ).pack(pady=(12, 2))
 
         self.demo_status = tk.Label(
             self.demo_window,
-            text="Send a chat message to visualize its journey.",
+            text="Send a chat message, then use Previous, Next or Auto Play.",
             font=("Arial", 10), fg="#444444", bg="white"
         )
         self.demo_status.pack(pady=(0, 5))
 
         self.demo_canvas = tk.Canvas(
-            self.demo_window, width=1040, height=600,
-            bg="white", highlightthickness=0
+            self.demo_window, height=690, bg="white", highlightthickness=0
         )
         self.demo_canvas.pack(fill=tk.BOTH, expand=True, padx=8)
+        self.demo_canvas.bind("<Configure>", lambda event: self._draw_packet_journey())
 
         controls = tk.Frame(self.demo_window, bg="white")
         controls.pack(pady=(4, 8))
-
-        tk.Button(controls, text="Previous", width=11,
-                  command=self.demo_previous).pack(side=tk.LEFT, padx=5)
-        tk.Button(controls, text="Next", width=11,
-                  command=self.demo_next).pack(side=tk.LEFT, padx=5)
-        self.demo_play_button = tk.Button(
-            controls, text="Auto Play", width=11,
-            command=self.demo_toggle_autoplay
-        )
+        tk.Button(controls, text="Previous", width=11, command=self.demo_previous).pack(side=tk.LEFT, padx=5)
+        tk.Button(controls, text="Next", width=11, command=self.demo_next).pack(side=tk.LEFT, padx=5)
+        self.demo_play_button = tk.Button(controls, text="Auto Play", width=11, command=self.demo_toggle_autoplay)
         self.demo_play_button.pack(side=tk.LEFT, padx=5)
-        tk.Button(controls, text="Reset", width=11,
-                  command=self.demo_reset).pack(side=tk.LEFT, padx=5)
+        tk.Button(controls, text="Reset", width=11, command=self.demo_reset).pack(side=tk.LEFT, padx=5)
 
         tk.Label(
             self.demo_window,
-            text=("Educational TCP/IP model view of the real chat message. "
-                  "LANConnect clients communicate with the server, which relays messages. "
-                  "The operating system performs the actual network encapsulation."),
-            font=("Arial", 9), fg="#666666", bg="white", wraplength=1000
+            text=("OSI is a 7-layer reference model. LANConnect sends chat over TCP/IP; "
+                  "the OSI layers below explain the corresponding networking functions. "
+                  "The server relays messages between clients; this is an educational visualization, not packet capture."),
+            font=("Arial", 9), fg="#666666", bg="white", wraplength=1050
         ).pack(pady=(0, 8))
 
         self.demo_step = 0
@@ -853,179 +846,165 @@ class LANConnectClient:
         self.demo_sender = sender
         self.demo_recipient = recipient
         if self.demo_window and self.demo_window.winfo_exists():
+            self._stop_demo_autoplay()
             self.demo_step = 0
-            self.demo_autoplay = False
-            if self.demo_after_id:
-                try:
-                    self.demo_window.after_cancel(self.demo_after_id)
-                except tk.TclError:
-                    pass
-                self.demo_after_id = None
-            self.demo_play_button.config(text="Auto Play")
             self._draw_packet_journey()
 
     def _journey_steps(self):
-        # Four-layer TCP/IP model: Application, Transport, Internet,
-        # and Network Access. Physical bits are shown as transmission,
-        # not as a separate TCP/IP layer.
         return [
-            "Application layer creates the original chat data.",
-            "Transport layer adds a TCP header: data becomes a TCP segment.",
-            "Internet layer adds an IP header: segment becomes an IP packet.",
-            "Network Access layer adds frame information: packet becomes a frame.",
-            "The frame is transmitted across the LAN to the LANConnect server.",
-            "The destination side receives the frame at Network Access.",
-            "Internet layer processes and removes the IP header.",
-            "Transport layer processes TCP and delivers the original data.",
-            "Application layer receives the original chat message."
+            "Application (Layer 7): the chat application creates the message.",
+            "Presentation (Layer 6): data representation / encoding is prepared.",
+            "Session (Layer 5): the application communication session is managed.",
+            "Transport (Layer 4): TCP adds transport information; data becomes a segment.",
+            "Network (Layer 3): IP addressing and routing information are applied; segment becomes a packet.",
+            "Data Link (Layer 2): local link framing information is applied; packet becomes a frame.",
+            "Physical (Layer 1): frame bits are transmitted over the physical medium.",
+            "Network transmission: data travels to the LANConnect server, which relays the chat message.",
+            "Physical (Layer 1): receiver obtains the incoming bits.",
+            "Data Link (Layer 2): frame is interpreted and link-layer information is processed.",
+            "Network (Layer 3): IP addressing information is processed.",
+            "Transport (Layer 4): TCP reassembles and delivers the ordered data stream.",
+            "Session (Layer 5): the communication session is maintained for the application.",
+            "Presentation (Layer 6): data is interpreted in the required representation.",
+            "Application (Layer 7): the original chat message reaches the receiving application."
         ]
 
     def _draw_packet_journey(self):
         if not self.demo_window or not self.demo_window.winfo_exists():
             return
-
         c = self.demo_canvas
         c.delete("all")
-        step = self.demo_step
         steps = self._journey_steps()
-        msg = self.demo_message or "Your chat message will appear here"
-        sender = self.demo_sender or "Device A"
-        receiver = self.demo_recipient or "Device B"
+        # Keep the animation index within its 15 valid stages (0..14).
+        # This also protects redraws triggered by autoplay/window resizing.
+        step = max(0, min(int(self.demo_step), len(steps) - 1))
+        self.demo_step = step
+        msg = self.demo_message or "Waiting for an actual LANConnect message"
+        sender = self.demo_sender or "Sender device"
+        receiver = self.demo_recipient or "Receiver device"
         if receiver == "ALL":
             receiver = "Group recipients"
 
-        # Reference-style device-to-device route, with the server relay shown
-        # because LANConnect clients connect to the server rather than directly.
-        c.create_text(150, 34, text="💻", font=("Arial", 27))
-        c.create_text(150, 68, text=sender, font=("Arial", 10, "bold"))
-        c.create_text(890, 34, text="💻", font=("Arial", 27))
-        c.create_text(890, 68, text=receiver, font=("Arial", 10, "bold"))
-        c.create_line(205, 42, 835, 42, fill="#555555", width=2,
-                      dash=(6, 4), arrow=tk.LAST)
-        c.create_rectangle(470, 18, 570, 48, outline="#635bff", width=2, fill="white")
-        c.create_text(520, 33, text="Chat data", font=("Arial", 9, "bold"))
-        c.create_text(520, 70, text="LANConnect server relays the message",
-                      fill="#666666", font=("Arial", 9))
-
-        # Four TCP/IP layers on each side.
-        left_x, right_x = 75, 675
-        box_w, box_h = 290, 66
-        ys = [125, 215, 305, 395]
-        layer_info = [
-            ("Application", "Message / application data", "#dbeafe", "#2563eb"),
-            ("Transport", "TCP header + data = TCP segment", "#e0e7ff", "#4f46e5"),
-            ("Internet", "IP header + TCP segment = IP packet", "#fef3c7", "#d97706"),
-            ("Network Access", "Frame header + IP packet = frame", "#ffedd5", "#ea580c")
+        width = max(c.winfo_width(), 1000)
+        center = width // 2
+        left_x, right_x = 48, width - 438
+        box_w, box_h, gap = 390, 54, 7
+        ys = [112 + i * (box_h + gap) for i in range(7)]
+        layers = [
+            ("7  Application", "Chat message / user data", "#dbeafe", "#2563eb"),
+            ("6  Presentation", "Data format, encoding, encryption", "#e0e7ff", "#4f46e5"),
+            ("5  Session", "Session establishment and management", "#ede9fe", "#7c3aed"),
+            ("4  Transport", "TCP segment — ports, sequencing, reliability", "#fef3c7", "#d97706"),
+            ("3  Network", "IP packet — logical addressing and routing", "#ffedd5", "#ea580c"),
+            ("2  Data Link", "Frame — MAC addressing and error detection", "#dcfce7", "#16a34a"),
+            ("1  Physical", "Bits — electrical / radio / optical signals", "#cffafe", "#0891b2")
         ]
 
-        c.create_text(left_x + box_w/2, 96, text="SENDER — ENCAPSULATION",
+        c.create_text(left_x + box_w/2, 24, text=f"SENDER — ENCAPSULATION\n{sender}",
                       font=("Arial", 11, "bold"), fill="#2563eb")
-        c.create_text(right_x + box_w/2, 96, text="RECEIVER — DECAPSULATION",
+        c.create_text(right_x + box_w/2, 24, text=f"RECEIVER — DECAPSULATION\n{receiver}",
                       font=("Arial", 11, "bold"), fill="#059669")
+        c.create_line(left_x + box_w + 12, 50, right_x - 12, 50,
+                      fill="#9ca3af", width=2, dash=(5, 4), arrow=tk.LAST)
+        c.create_rectangle(center-55, 36, center+55, 64, fill="white", outline="#635bff", width=2)
+        c.create_text(center, 50, text="LANConnect server", font=("Arial", 8, "bold"))
 
-        # Sender stack: each completed step adds one header to the PDU.
-        sender_active = min(max(step, 0), 3)
-        receiver_active = None
-        if step >= 5:
-            receiver_active = min(step - 5, 3)
-
+        # Seven sender layers (indices 0..6). Receiver decapsulation
+        # starts at step 8 with Physical and finishes at step 14.
+        sender_count = min(len(layers), max(0, step + 1))
+        receiver_count = min(len(layers), max(0, step - 7))
         sender_texts = [
             f'Application data\n"{msg}"',
-            f'TCP segment\n[TCP header] + ["{msg}"]',
-            f'IP packet\n[IP header] + [TCP segment]',
-            f'Network frame\n[Frame header] + [IP packet]'
+            "Presentation data\n[representation / encoding] + data",
+            "Session data\n[session context] + presentation data",
+            "TCP segment\n[TCP header] + upper-layer data",
+            "IP packet\n[IP header] + [TCP segment]",
+            "Data-link frame\n[Frame header/trailer] + [IP packet]",
+            "Bits\n10110010 ... transmitted signals"
         ]
         receiver_texts = [
-            'Application data\nOriginal message delivered',
-            'TCP segment\nTCP header processed / removed',
-            'IP packet\nIP header processed / removed',
-            'Network frame\nFrame received'
+            f'Application data\n"{msg}"',
+            "Presentation data\nData interpreted for the application",
+            "Session data\nSession information handled",
+            "TCP data\nTCP header processed; stream delivered",
+            "IP packet\nIP header processed",
+            "Data-link frame\nFrame header/trailer processed",
+            "Bits\nIncoming bits received from medium"
         ]
 
-        for i, (name, detail, fill, accent) in enumerate(layer_info):
-            y = ys[i]
-            # Sender blocks show the current PDU at each encapsulation stage.
-            active_sender = step == i or (step > i and i <= 3)
-            sender_fill = "#bfdbfe" if active_sender else fill
-            sender_outline = "#2563eb" if step == i else accent
-            c.create_rectangle(left_x, y, left_x + box_w, y + box_h,
-                               fill=sender_fill, outline=sender_outline,
-                               width=3 if step == i else 1)
-            c.create_text(left_x + 12, y + 15, text=name, anchor="w",
-                          fill=accent, font=("Arial", 10, "bold"))
-            c.create_text(left_x + 12, y + 43,
-                          text=sender_texts[i] if step >= i else detail,
-                          anchor="w", fill="#222222", font=("Arial", 9))
-
-            # Receiver side remains pending until transmission has happened,
-            # then the same PDU is progressively decapsulated in reverse.
-            rfill = "#d1fae5"
-            routline = "#059669"
-            rtext = "Waiting for frame..."
-            if step >= 5:
-                # Reverse mapping: frame, internet, transport, application.
-                reverse_index = 3 - i
-                if reverse_index <= (step - 5):
-                    rfill = "#a7f3d0"
-                    routline = "#059669"
-                    rtext = receiver_texts[i]
-                if step == 8 and i == 0:
-                    rtext = f'Application data\n"{msg}"'
-            c.create_rectangle(right_x, y, right_x + box_w, y + box_h,
-                               fill=rfill, outline=routline,
-                               width=3 if (step >= 5 and reverse_index == step - 5) else 1)
-            c.create_text(right_x + 12, y + 15, text=name, anchor="w",
-                          fill="#047857", font=("Arial", 10, "bold"))
-            c.create_text(right_x + 12, y + 43, text=rtext,
-                          anchor="w", fill="#222222", font=("Arial", 9))
-
-            if i < 3:
-                c.create_text(left_x + box_w/2, y + box_h + 11,
-                              text="↓", fill="#666666", font=("Arial", 14))
-                c.create_text(right_x + box_w/2, y + box_h + 11,
-                              text="↑", fill="#666666", font=("Arial", 14))
-
-        # Network transmission path: packet/frame moves left-to-right.
-        c.create_text(520, 493, text="NETWORK TRANSMISSION",
-                      font=("Arial", 11, "bold"), fill="#111827")
-        c.create_line(120, 525, 920, 525, fill="#6b7280", width=3,
-                      arrow=tk.LAST)
-        c.create_text(520, 550,
-                      text="Frame is carried as bits over the local network; server relays chat data",
-                      font=("Arial", 9), fill="#555555")
-
-        # Move packet along route according to the selected step.
-        if step <= 3:
-            packet_x = 120
-            packet_label = ["DATA", "TCP", "IP", "FRAME"][step]
-        elif step == 4:
-            packet_x = 520
-            packet_label = "FRAME"
-        else:
-            packet_x = 920
-            packet_label = "FRAME"
-
-        c.create_oval(packet_x - 25, 505, packet_x + 25, 545,
-                      fill="#635bff", outline="#4338ca", width=1)
-        c.create_text(packet_x, 525, text=packet_label,
-                      fill="white", font=("Arial", 8, "bold"))
-
-        # Show actual chat content without substituting a fixed demo message.
-        c.create_rectangle(75, 572, 965, 596,
-                           fill="#f8fafc", outline="#d1d5db")
-        c.create_text(88, 584, text=f'Actual LANConnect message: "{msg}"',
-                      anchor="w", font=("Arial", 9), fill="#222222")
-
-        self.demo_status.config(
-            text=f"Step {step + 1}/{len(steps)} — {steps[step]}"
+        # Iterate only over entries that exist in every parallel layer list.
+        layer_count = min(
+            len(layers), len(ys), len(sender_texts), len(receiver_texts)
         )
+        for i in range(layer_count):
+            name, detail, fill, accent = layers[i]
+            y = ys[i]
+            sender_done = i < sender_count
+            sender_current = (step == i and i < 7)
+            sf = "#bfdbfe" if sender_done else fill
+            c.create_rectangle(left_x, y, left_x+box_w, y+box_h, fill=sf,
+                               outline=accent, width=3 if sender_current else 1)
+            c.create_text(left_x+12, y+14, text=name, anchor="w",
+                          fill=accent, font=("Arial", 9, "bold"))
+            c.create_text(left_x+12, y+37,
+                          text=sender_texts[i] if sender_done else detail,
+                          anchor="w", fill="#222222", font=("Arial", 8))
+
+            # Receiver decapsulation progresses bottom-up: Physical to Application.
+            reverse_index = layer_count - 1 - i
+            receiver_done = receiver_count > reverse_index
+            receiver_current = (
+                receiver_count == reverse_index + 1 and step >= 8
+            )
+            rf = "#a7f3d0" if receiver_done else "#f0fdf4"
+            rtext = receiver_texts[i] if receiver_done else "Waiting for incoming data..."
+            c.create_rectangle(right_x, y, right_x+box_w, y+box_h, fill=rf,
+                               outline="#059669", width=3 if receiver_current else 1)
+            c.create_text(right_x+12, y+14, text=name, anchor="w",
+                          fill="#047857", font=("Arial", 9, "bold"))
+            c.create_text(right_x+12, y+37, text=rtext,
+                          anchor="w", fill="#222222", font=("Arial", 8))
+
+            if i < 6:
+                c.create_text(left_x+box_w/2, y+box_h+gap/2, text="↓",
+                              fill="#64748b", font=("Arial", 12, "bold"))
+                c.create_text(right_x+box_w/2, y+box_h+gap/2, text="↑",
+                              fill="#64748b", font=("Arial", 12, "bold"))
+
+        # Network path and moving packet marker.
+        path_y = ys[-1] + box_h + 48
+        c.create_text(center, path_y-23, text="NETWORK TRANSMISSION",
+                      font=("Arial", 10, "bold"), fill="#111827")
+        c.create_line(left_x+20, path_y+5, right_x+box_w-20, path_y+5,
+                      fill="#64748b", width=3, arrow=tk.LAST)
+        if step <= 6:
+            packet_x = left_x + 28
+            packet_labels = ["DATA", "PRES", "SESS", "TCP", "IP", "FRAME", "BITS"]
+            packet_label = packet_labels[min(step, len(packet_labels) - 1)]
+        elif step == 7:
+            packet_x = center
+            packet_label = "BITS"
+        else:
+            packet_x = right_x + box_w - 28
+            packet_label = "BITS"
+        c.create_oval(packet_x-22, path_y-12, packet_x+22, path_y+22,
+                      fill="#635bff", outline="#4338ca", width=1)
+        c.create_text(packet_x, path_y+5, text=packet_label,
+                      fill="white", font=("Arial", 7, "bold"))
+
+        c.create_rectangle(left_x, path_y+34, right_x+box_w, path_y+62,
+                           fill="#f8fafc", outline="#d1d5db")
+        c.create_text(left_x+10, path_y+48,
+                      text=f'Actual LANConnect message: "{msg}"',
+                      anchor="w", font=("Arial", 9), fill="#222222")
+        self.demo_status.config(text=f"Step {step+1}/{len(steps)} — {steps[step]}")
 
     def demo_next(self):
         if self.demo_step < len(self._journey_steps()) - 1:
             self.demo_step += 1
             self._draw_packet_journey()
         else:
-            self.demo_status.config(text="Journey complete — original message delivered.")
+            self.demo_status.config(text="OSI journey complete — original message delivered.")
 
     def demo_previous(self):
         self._stop_demo_autoplay()
@@ -1047,7 +1026,7 @@ class LANConnectClient:
         if self.demo_step < len(self._journey_steps()) - 1:
             self.demo_step += 1
             self._draw_packet_journey()
-            self.demo_after_id = self.demo_window.after(650, self._demo_autoplay_tick)
+            self.demo_after_id = self.demo_window.after(900, self._demo_autoplay_tick)
         else:
             self._stop_demo_autoplay()
 
